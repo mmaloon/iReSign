@@ -1,0 +1,83 @@
+
+startup: 
+	get user certificates
+
+	retrieve stored entitlement, mobileprovision path
+
+	check that '/usr/bin/zip' program exist
+	check that '/usr/bin/codesign' program exists
+
+resignClick:
+	store selected certificate, entitlement, mobileprovision
+
+	originalIpaPath = value from IPA input field
+	workingPath = temporaryDirectoryPath
+
+	check certificate is selected or display error
+
+	check originalIpaPath has '.ipa' extension or display error
+
+	remove directory at workingPath
+	create directory at workingPath
+
+	`/usr/bin/unzip -q <originalIpaPath> -d <workingPath>`
+
+	verify the 'Payload' directory exists in workingPath directory
+
+	if change bundle ID checkbox checked
+		doBundleIDChange
+
+	if provisioning file provided
+		doProvisioning
+	else
+		doCodeSigning
+
+
+
+doBundleIDChange:
+	infoPlistPath = file with extension 'plist' in workingPath
+	change the "softwareVersionBundleId" property to new bundle ID
+
+	plistFile = <workingPath>/Payload/<appname>.app/Info.plist
+	change the "CFBundleIdentifier" property to new bundle ID
+
+doProvisioning:
+	delete Payload/*.app/embedded.mobileprovision
+	`/bin/cp <ProvisioningFilePath> Payload/*.app/embedded.mobileprovision`
+
+	search in embedded.mobileprovision for 'application-identifier'
+	identifier = one the line after ^^, find contents between <string>....</string>
+	check that identifier is in Info.plist file
+	doCodeSigning
+
+
+doCodeSigning:
+	add '-fs <certificate>' argument
+	get system version from /System/Library/CoreServices/SystemVersion.plist
+	if version < 10.9
+		include ResourceRules.plist (in iReSign project) as `--resource-rules=<resourceRulespath>` argument
+	else
+		remove CFBundleResourceSpecification from the Info.plist file
+
+	if entitlements file provided, add `--entitlements=<entitlementsPath>` argument
+
+	add <appPath> to arguments
+
+	`/usr/bin/codesign <arguments>`
+
+	doVerifySignature
+
+doVerifySignature:
+	`/usr/bin/codesign -v <appPath>`
+	if success
+		doZip
+
+doZip:
+	destination = <originalIpaPath>_resigned.ipa
+	set currentDir to workingPath
+	`/usr/bin/zip -qry <destination> .`
+	remove workingPath
+
+
+
+

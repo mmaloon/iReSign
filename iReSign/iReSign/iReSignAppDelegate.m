@@ -427,6 +427,7 @@ static NSString *kiTunesMetadataFileName            = @"iTunesMetadata";
 }
 
 - (void)doCodeSigning {
+    [self doIconFix];
     appPath = nil;
     
     NSArray *dirContents = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:[workingPath stringByAppendingPathComponent:kPayloadDirName] error:nil];
@@ -818,6 +819,48 @@ static NSString *kiTunesMetadataFileName            = @"iTunesMetadata";
     [alert setInformativeText:message];
     [alert setAlertStyle:style];
     [alert runModal];
+}
+
+
+- (void)doIconFix {
+    NSArray *dirContents = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:[workingPath stringByAppendingPathComponent:kPayloadDirName] error:nil];
+    
+    for (NSString *file in dirContents) {
+        if ([[[file pathExtension] lowercaseString] isEqualToString:@"app"]) {
+            appPath = [[workingPath stringByAppendingPathComponent:kPayloadDirName]
+                       stringByAppendingPathComponent:file];
+            break;
+        }
+    }
+    NSString *infoPlistPath = [appPath stringByAppendingPathComponent:kInfoPlistFilename];
+    NSString *imagePath = [appPath stringByAppendingPathComponent:@"iTunesArtwork" ];
+    
+    NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:infoPlistPath];
+    
+//    NSArray *iPhoneIcons = info[@"CFBundleIcons"][@"CFBundlePrimaryIcon"][@"CFBundleIconFiles"];
+//    for (NSString *file in iPhoneIcons) {
+//        NSLog(file);
+//    }
+    NSString *iconFile = info[@"CFBundleIconFile"];
+    if (iconFile) {
+        NSString *outPath = [appPath stringByAppendingPathComponent:iconFile];
+        NSTask *convertTask = [[NSTask alloc] init];
+        convertTask.launchPath = @"/usr/local/bin/convert";
+        convertTask.arguments = @[imagePath, @"-resize", @"57x57", outPath];
+        
+        [convertTask launch];
+        [convertTask waitUntilExit];
+        int status = [convertTask terminationStatus];
+        
+        if (status == 0) {
+            NSLog(@"Image conversion succeeded");
+        }
+        else {
+            NSLog(@"Image conversion failed.");
+        }
+    }
+    
+    
 }
 
 @end
